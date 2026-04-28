@@ -1,0 +1,17 @@
+# VideoSnip AI Agent - Python Dependencies
+# Install with: pip install -r requirements.txt
+
+# ── Core Pipeline ──────────────────────────────
+openai-whisper          # Local speech-to-text (runs on CPU or GPU)
+yt-dlp                  # YouTube downloader (kept updated)
+ffmpeg-python           # FFmpeg Python bindings
+
+# ── LLM Backends (install what you need) ───────
+anthropic               # Claude API  →  needs ANTHROPIC_API_KEY
+google-generativeai     # Gemini API  →  needs GEMINI_API_KEY
+openai                  # OpenAI API  →  needs OPENAI_API_KEY
+requests                # Ollama (local, no key needed)
+
+# ── Utilities ──────────────────────────────────
+torch                   # Required by Whisper (CPU version is fine)
+tqdm                    # Progress bars

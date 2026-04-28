@@ -1,0 +1,770 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VideoSnip AI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0a0a0f;
+    --surface: #111118;
+    --border: #1e1e2e;
+    --accent: #e8ff47;
+    --accent2: #47ffb8;
+    --muted: #3a3a50;
+    --text: #e8e8f0;
+    --text-dim: #6b6b88;
+    --red: #ff4757;
+    --claude: #d4793a;
+    --gemini: #4285f4;
+    --ollama: #47ffb8;
+    --openai: #10a37f;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Syne', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── Background grid ── */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(232,255,71,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(232,255,71,0.03) 1px, transparent 1px);
+    background-size: 48px 48px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* ── Glow blobs ── */
+  .blob {
+    position: fixed;
+    border-radius: 50%;
+    filter: blur(120px);
+    opacity: 0.12;
+    pointer-events: none;
+    z-index: 0;
+    animation: drift 12s ease-in-out infinite alternate;
+  }
+  .blob-1 { width: 500px; height: 500px; background: var(--accent); top: -100px; left: -150px; }
+  .blob-2 { width: 400px; height: 400px; background: var(--accent2); bottom: -80px; right: -100px; animation-delay: -6s; }
+
+  @keyframes drift {
+    from { transform: translate(0, 0) scale(1); }
+    to   { transform: translate(30px, 20px) scale(1.05); }
+  }
+
+  /* ── Layout ── */
+  .container {
+    position: relative;
+    z-index: 1;
+    max-width: 780px;
+    margin: 0 auto;
+    padding: 0 24px 80px;
+  }
+
+  /* ── Header ── */
+  header {
+    padding: 52px 0 40px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .logo-mark {
+    width: 48px; height: 48px;
+    background: var(--accent);
+    display: grid;
+    place-items: center;
+    clip-path: polygon(0 0, 80% 0, 100% 20%, 100% 100%, 20% 100%, 0 80%);
+    flex-shrink: 0;
+  }
+
+  .logo-mark svg { color: #0a0a0f; }
+
+  .logo-text h1 {
+    font-size: 1.5rem;
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    line-height: 1;
+  }
+
+  .logo-text p {
+    font-size: 0.78rem;
+    color: var(--text-dim);
+    font-family: 'DM Mono', monospace;
+    margin-top: 2px;
+    letter-spacing: 0.04em;
+  }
+
+  .badge {
+    margin-left: auto;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.65rem;
+    color: var(--accent2);
+    border: 1px solid var(--accent2);
+    padding: 4px 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    opacity: 0.7;
+  }
+
+  /* ── Cards ── */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 28px;
+    margin-bottom: 16px;
+    position: relative;
+  }
+
+  .card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0;
+    width: 3px; height: 100%;
+    background: var(--accent);
+  }
+
+  .card-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.65rem;
+    color: var(--accent);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .card-label::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  /* ── URL Input ── */
+  .url-wrap {
+    display: flex;
+    gap: 10px;
+  }
+
+  .url-input {
+    flex: 1;
+    background: var(--bg);
+    border: 1px solid var(--muted);
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    font-size: 0.85rem;
+    padding: 13px 16px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  .url-input::placeholder { color: var(--text-dim); }
+  .url-input:focus { border-color: var(--accent); }
+
+  .paste-btn {
+    background: var(--muted);
+    border: none;
+    color: var(--text-dim);
+    font-family: 'DM Mono', monospace;
+    font-size: 0.72rem;
+    padding: 0 16px;
+    cursor: pointer;
+    letter-spacing: 0.05em;
+    transition: all 0.15s;
+    text-transform: uppercase;
+  }
+
+  .paste-btn:hover { background: var(--border); color: var(--text); }
+
+  /* ── LLM Selector ── */
+  .llm-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+  }
+
+  .llm-option {
+    display: none;
+  }
+
+  .llm-option + label {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 16px 8px;
+    border: 1px solid var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+    user-select: none;
+  }
+
+  .llm-option + label:hover {
+    border-color: var(--text-dim);
+    background: rgba(255,255,255,0.02);
+  }
+
+  .llm-option:checked + label {
+    border-color: var(--accent);
+    background: rgba(232,255,71,0.05);
+  }
+
+  .llm-dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+  }
+
+  .llm-name {
+    font-size: 0.8rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+  }
+
+  .llm-desc {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.6rem;
+    color: var(--text-dim);
+    text-align: center;
+    letter-spacing: 0.04em;
+  }
+
+  #llm-claude + label .llm-dot { background: var(--claude); }
+  #llm-gemini + label .llm-dot { background: var(--gemini); }
+  #llm-ollama + label .llm-dot { background: var(--ollama); }
+  #llm-openai + label .llm-dot { background: var(--openai); }
+
+  /* ── Duration Slider ── */
+  .duration-row {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+  }
+
+  .duration-value {
+    font-family: 'DM Mono', monospace;
+    font-size: 1.6rem;
+    font-weight: 500;
+    color: var(--accent);
+    min-width: 80px;
+    line-height: 1;
+  }
+
+  .duration-unit {
+    font-size: 0.75rem;
+    color: var(--text-dim);
+    display: block;
+    font-family: 'DM Mono', monospace;
+  }
+
+  input[type=range] {
+    flex: 1;
+    -webkit-appearance: none;
+    height: 3px;
+    background: var(--muted);
+    outline: none;
+    cursor: pointer;
+  }
+
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 18px; height: 18px;
+    background: var(--accent);
+    border-radius: 0;
+    clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
+  }
+
+  /* ── Ollama model input ── */
+  .ollama-field {
+    display: none;
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px solid var(--border);
+  }
+
+  .ollama-field.visible { display: flex; gap: 10px; align-items: center; }
+
+  .ollama-field label {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.72rem;
+    color: var(--text-dim);
+    white-space: nowrap;
+    letter-spacing: 0.06em;
+  }
+
+  .ollama-field input {
+    flex: 1;
+    background: var(--bg);
+    border: 1px solid var(--muted);
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    font-size: 0.82rem;
+    padding: 8px 12px;
+    outline: none;
+  }
+
+  .ollama-field input:focus { border-color: var(--accent2); }
+
+  /* ── Run Button ── */
+  .run-btn {
+    width: 100%;
+    padding: 18px;
+    background: var(--accent);
+    color: #0a0a0f;
+    border: none;
+    font-family: 'Syne', sans-serif;
+    font-size: 1rem;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.15s;
+    clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+  }
+
+  .run-btn:hover { background: #f5ff6e; transform: translateY(-1px); }
+  .run-btn:active { transform: translateY(0); }
+  .run-btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+  /* ── Terminal Output ── */
+  .terminal {
+    display: none;
+    background: #060608;
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent2);
+    padding: 20px;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.78rem;
+    line-height: 1.8;
+    margin-top: 16px;
+    max-height: 320px;
+    overflow-y: auto;
+  }
+
+  .terminal.visible { display: block; }
+
+  .t-line { color: var(--text-dim); }
+  .t-success { color: var(--accent2); }
+  .t-step { color: var(--accent); }
+  .t-error { color: var(--red); }
+  .t-info { color: #a0a0c0; }
+
+  .cursor {
+    display: inline-block;
+    width: 8px; height: 13px;
+    background: var(--accent);
+    animation: blink 1s step-end infinite;
+    vertical-align: text-bottom;
+    margin-left: 2px;
+  }
+
+  @keyframes blink { 50% { opacity: 0; } }
+
+  /* ── Command Preview ── */
+  .cmd-preview {
+    background: var(--bg);
+    border: 1px dashed var(--muted);
+    padding: 14px 18px;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.75rem;
+    color: var(--text-dim);
+    line-height: 1.6;
+    margin-top: 12px;
+    word-break: break-all;
+  }
+
+  .cmd-preview span { color: var(--accent); }
+
+  /* ── Steps progress ── */
+  .steps {
+    display: flex;
+    gap: 0;
+    margin-bottom: 16px;
+  }
+
+  .step {
+    flex: 1;
+    padding: 10px 6px;
+    border: 1px solid var(--border);
+    border-right: none;
+    text-align: center;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.62rem;
+    color: var(--text-dim);
+    letter-spacing: 0.06em;
+    transition: all 0.3s;
+    position: relative;
+  }
+
+  .step:last-child { border-right: 1px solid var(--border); }
+  .step.active { border-color: var(--accent); color: var(--accent); background: rgba(232,255,71,0.05); z-index: 1; }
+  .step.done { border-color: var(--accent2); color: var(--accent2); }
+
+  .step-num {
+    display: block;
+    font-size: 1rem;
+    margin-bottom: 2px;
+  }
+
+  /* ── Copy button ── */
+  .copy-wrap {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 8px;
+  }
+
+  .copy-btn {
+    background: none;
+    border: 1px solid var(--muted);
+    color: var(--text-dim);
+    font-family: 'DM Mono', monospace;
+    font-size: 0.65rem;
+    padding: 5px 12px;
+    cursor: pointer;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    transition: all 0.15s;
+  }
+
+  .copy-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* ── Footer ── */
+  footer {
+    text-align: center;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.65rem;
+    color: var(--text-dim);
+    padding-top: 40px;
+    letter-spacing: 0.06em;
+    opacity: 0.5;
+  }
+</style>
+</head>
+<body>
+
+<div class="blob blob-1"></div>
+<div class="blob blob-2"></div>
+
+<div class="container">
+  <header>
+    <div class="logo-mark">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+        <polygon points="5 3 19 12 5 21 5 3"/>
+      </svg>
+    </div>
+    <div class="logo-text">
+      <h1>VideoSnip<span style="color:var(--accent)">AI</span></h1>
+      <p>youtube → ai highlights → short clip</p>
+    </div>
+    <div class="badge">Local Agent</div>
+  </header>
+
+  <!-- Step 1: URL -->
+  <div class="card">
+    <div class="card-label">01 — YouTube URL</div>
+    <div class="url-wrap">
+      <input class="url-input" id="urlInput" type="text" placeholder="https://youtube.com/watch?v=..." autocomplete="off">
+      <button class="paste-btn" onclick="pasteUrl()">Paste</button>
+    </div>
+  </div>
+
+  <!-- Step 2: LLM -->
+  <div class="card">
+    <div class="card-label">02 — AI Backend</div>
+    <div class="llm-grid">
+      <input type="radio" name="llm" id="llm-claude" value="claude" checked class="llm-option">
+      <label for="llm-claude">
+        <div class="llm-dot"></div>
+        <div class="llm-name">Claude</div>
+        <div class="llm-desc">API Key<br>Required</div>
+      </label>
+
+      <input type="radio" name="llm" id="llm-gemini" value="gemini" class="llm-option">
+      <label for="llm-gemini">
+        <div class="llm-dot"></div>
+        <div class="llm-name">Gemini</div>
+        <div class="llm-desc">API Key<br>Required</div>
+      </label>
+
+      <input type="radio" name="llm" id="llm-ollama" value="ollama" class="llm-option">
+      <label for="llm-ollama">
+        <div class="llm-dot"></div>
+        <div class="llm-name">Ollama</div>
+        <div class="llm-desc">100% Local<br>No Key</div>
+      </label>
+
+      <input type="radio" name="llm" id="llm-openai" value="openai" class="llm-option">
+      <label for="llm-openai">
+        <div class="llm-dot"></div>
+        <div class="llm-name">OpenAI</div>
+        <div class="llm-desc">API Key<br>Required</div>
+      </label>
+    </div>
+
+    <div class="ollama-field" id="ollamaField">
+      <label>MODEL →</label>
+      <input type="text" id="ollamaModel" value="mistral" placeholder="mistral / llama3 / gemma2 ...">
+    </div>
+  </div>
+
+  <!-- Step 3: Duration -->
+  <div class="card">
+    <div class="card-label">03 — Target Duration</div>
+    <div class="duration-row">
+      <div class="duration-value">
+        <span id="durVal">90</span>
+        <span class="duration-unit">seconds</span>
+      </div>
+      <input type="range" id="durSlider" min="30" max="300" step="15" value="90" oninput="updateDuration(this.value)">
+    </div>
+  </div>
+
+  <!-- Command Preview -->
+  <div class="cmd-preview" id="cmdPreview">
+    <span>$</span> python agent.py <span id="previewUrl">"&lt;url&gt;"</span> --llm <span id="previewLlm">claude</span> --duration <span id="previewDur">90</span>
+  </div>
+  <div class="copy-wrap">
+    <button class="copy-btn" onclick="copyCommand()">Copy Command</button>
+  </div>
+
+  <!-- Run -->
+  <div style="margin-top:20px">
+    <button class="run-btn" id="runBtn" onclick="runAgent()">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+      Generate Highlight
+    </button>
+  </div>
+
+  <!-- Progress Steps -->
+  <div class="steps" id="stepsRow" style="margin-top:20px; display:none">
+    <div class="step" id="s1"><span class="step-num">📥</span>DOWNLOAD</div>
+    <div class="step" id="s2"><span class="step-num">🎙</span>TRANSCRIBE</div>
+    <div class="step" id="s3"><span class="step-num">🤖</span>AI ANALYZE</div>
+    <div class="step" id="s4"><span class="step-num">✂️</span>CUT VIDEO</div>
+  </div>
+
+  <!-- Terminal -->
+  <div class="terminal" id="terminal"></div>
+
+  <footer>
+    VideoSnip AI · runs locally · no data sent to cloud (except LLM API calls)
+  </footer>
+</div>
+
+<script>
+  // ── Live command preview ──
+  function updatePreview() {
+    const url = document.getElementById('urlInput').value || '<url>';
+    const llm = document.querySelector('input[name=llm]:checked').value;
+    const dur = document.getElementById('durSlider').value;
+    const ollamaModel = document.getElementById('ollamaModel').value || 'mistral';
+
+    document.getElementById('previewUrl').textContent = `"${url}"`;
+    document.getElementById('previewLlm').textContent = llm;
+    document.getElementById('previewDur').textContent = dur;
+
+    // Show/hide ollama field
+    document.getElementById('ollamaField').classList.toggle('visible', llm === 'ollama');
+
+    let cmd = `python agent.py "${url}" --llm ${llm} --duration ${dur}`;
+    if (llm === 'ollama') cmd += ` --ollama-model ${ollamaModel}`;
+    document.getElementById('cmdPreview').innerHTML =
+      `<span>$</span> python agent.py "${url}" --llm <span>${llm}</span> --duration <span>${dur}</span>` +
+      (llm === 'ollama' ? ` --ollama-model <span>${ollamaModel}</span>` : '');
+  }
+
+  function updateDuration(val) {
+    document.getElementById('durVal').textContent = val;
+    updatePreview();
+  }
+
+  document.getElementById('urlInput').addEventListener('input', updatePreview);
+  document.querySelectorAll('input[name=llm]').forEach(r => r.addEventListener('change', updatePreview));
+  document.getElementById('ollamaModel').addEventListener('input', updatePreview);
+
+  async function pasteUrl() {
+    try {
+      const text = await navigator.clipboard.readText();
+      document.getElementById('urlInput').value = text;
+      updatePreview();
+    } catch {
+      document.getElementById('urlInput').focus();
+    }
+  }
+
+  function copyCommand() {
+    const url = document.getElementById('urlInput').value || '<url>';
+    const llm = document.querySelector('input[name=llm]:checked').value;
+    const dur = document.getElementById('durSlider').value;
+    const ollamaModel = document.getElementById('ollamaModel').value || 'mistral';
+    let cmd = `python agent.py "${url}" --llm ${llm} --duration ${dur}`;
+    if (llm === 'ollama') cmd += ` --ollama-model ${ollamaModel}`;
+    navigator.clipboard.writeText(cmd).then(() => {
+      const btn = document.querySelector('.copy-btn');
+      btn.textContent = 'Copied!';
+      setTimeout(() => btn.textContent = 'Copy Command', 1500);
+    });
+  }
+
+  // ── Simulated agent run ──
+  let running = false;
+
+  function log(text, cls = 't-line') {
+    const t = document.getElementById('terminal');
+    const line = document.createElement('div');
+    line.className = cls;
+    line.innerHTML = text;
+    t.appendChild(line);
+    t.scrollTop = t.scrollHeight;
+  }
+
+  function setStep(n) {
+    for (let i = 1; i <= 4; i++) {
+      const el = document.getElementById(`s${i}`);
+      if (i < n) el.className = 'step done';
+      else if (i === n) el.className = 'step active';
+      else el.className = 'step';
+    }
+  }
+
+  function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+  async function runAgent() {
+    const url = document.getElementById('urlInput').value.trim();
+    if (!url) {
+      document.getElementById('urlInput').focus();
+      document.getElementById('urlInput').style.borderColor = 'var(--red)';
+      setTimeout(() => document.getElementById('urlInput').style.borderColor = '', 1500);
+      return;
+    }
+
+    if (running) return;
+    running = true;
+
+    const llm = document.querySelector('input[name=llm]:checked').value;
+    const dur = document.getElementById('durSlider').value;
+    const ollamaModel = document.getElementById('ollamaModel').value || 'mistral';
+
+    document.getElementById('runBtn').disabled = true;
+    document.getElementById('terminal').innerHTML = '';
+    document.getElementById('terminal').classList.add('visible');
+    document.getElementById('stepsRow').style.display = 'flex';
+
+    const fullCmd = `python agent.py "${url}" --llm ${llm} --duration ${dur}` +
+      (llm === 'ollama' ? ` --ollama-model ${ollamaModel}` : '');
+
+    log(`<span style="color:var(--accent)">$</span> ${fullCmd}`);
+    log('');
+    log('🎬 VideoSnip AI Agent', 't-step');
+    log('━'.repeat(48));
+    await sleep(600);
+
+    // Step 1
+    setStep(1);
+    log('');
+    log('📥 [1/4] Downloading video from YouTube...', 't-step');
+    await sleep(400);
+    log('    → Resolving video ID...', 't-info');
+    await sleep(800);
+    log('    → Selecting format: 720p MP4 + M4A audio', 't-info');
+    await sleep(1200);
+    log('    → Merging streams with FFmpeg...', 't-info');
+    await sleep(1000);
+    log('    ✅ Downloaded: temp/video.mp4', 't-success');
+
+    // Step 2
+    setStep(2);
+    await sleep(400);
+    log('');
+    log("🎙️  [2/4] Transcribing audio with Whisper...", 't-step');
+    await sleep(300);
+    log("    → Loading Whisper 'base' model...", 't-info');
+    await sleep(900);
+    log('    → Extracting audio track...', 't-info');
+    await sleep(700);
+    log('    → Running speech recognition (this may take a moment)...', 't-info');
+    await sleep(2200);
+    log('    ✅ Transcribed 247 segments | Language: en', 't-success');
+
+    // Step 3
+    setStep(3);
+    await sleep(400);
+    log('');
+    log(`🤖 [3/4] Analyzing with ${llm.toUpperCase()} to find key moments...`, 't-step');
+    await sleep(300);
+    log('    → Building prompt with transcript...', 't-info');
+    await sleep(500);
+    log(`    → Sending to ${llm} API...`, 't-info');
+    await sleep(1800);
+    log('    → Parsing segment response...', 't-info');
+    await sleep(400);
+    log('    ✅ Selected 4 segments (~' + dur + 's total)', 't-success');
+    await sleep(200);
+    log('       [1]  0:08 → 0:42  | Opening hook & context setup', 't-line');
+    await sleep(100);
+    log('       [2]  2:15 → 3:01  | Key insight: main argument', 't-line');
+    await sleep(100);
+    log('       [3]  5:44 → 6:20  | Concrete example & data point', 't-line');
+    await sleep(100);
+    log('       [4]  9:30 → 10:05 | Closing takeaway & call to action', 't-line');
+
+    // Step 4
+    setStep(4);
+    await sleep(400);
+    log('');
+    log('✂️  [4/4] Cutting and stitching video with FFmpeg...', 't-step');
+    await sleep(300);
+    log('    → Cutting clip 1 (34s)...', 't-info');
+    await sleep(600);
+    log('    → Cutting clip 2 (46s)...', 't-info');
+    await sleep(600);
+    log('    → Cutting clip 3 (36s)...', 't-info');
+    await sleep(500);
+    log('    → Cutting clip 4 (35s)...', 't-info');
+    await sleep(500);
+    log('    → Concatenating 4 clips...', 't-info');
+    await sleep(900);
+    log('    ✅ Saved to: output/highlight.mp4', 't-success');
+
+    // Done
+    await sleep(300);
+    log('');
+    log('━'.repeat(48));
+    log(`🎉 Done! highlight.mp4 is ready in /output/`, 't-success');
+    log(`   Total duration: ~${dur}s | 4 segments`, 't-success');
+    log('');
+
+    // Update all steps done
+    for (let i = 1; i <= 4; i++) document.getElementById(`s${i}`).className = 'step done';
+
+    document.getElementById('runBtn').innerHTML = `
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+      Complete — Run Again
+    `;
+    document.getElementById('runBtn').disabled = false;
+    running = false;
+  }
+
+  // Init
+  updatePreview();
+</script>
+</body>
+</html>

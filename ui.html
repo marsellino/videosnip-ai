@@ -1,0 +1,681 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VideoSnip AI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0a0a0f;
+    --surface: #111118;
+    --border: #1e1e2e;
+    --accent: #e8ff47;
+    --accent2: #47ffb8;
+    --muted: #3a3a50;
+    --text: #e8e8f0;
+    --text-dim: #6b6b88;
+    --red: #ff4757;
+    --gemini: #4285f4;
+    --ollama: #47ffb8;
+    --openai: #10a37f;
+    --claude: #d4793a;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Syne', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(232,255,71,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(232,255,71,0.03) 1px, transparent 1px);
+    background-size: 48px 48px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .blob {
+    position: fixed;
+    border-radius: 50%;
+    filter: blur(120px);
+    opacity: 0.12;
+    pointer-events: none;
+    z-index: 0;
+    animation: drift 12s ease-in-out infinite alternate;
+  }
+  .blob-1 { width: 500px; height: 500px; background: var(--accent); top: -100px; left: -150px; }
+  .blob-2 { width: 400px; height: 400px; background: var(--accent2); bottom: -80px; right: -100px; animation-delay: -6s; }
+
+  @keyframes drift {
+    from { transform: translate(0,0) scale(1); }
+    to   { transform: translate(30px,20px) scale(1.05); }
+  }
+
+  .container {
+    position: relative;
+    z-index: 1;
+    max-width: 780px;
+    margin: 0 auto;
+    padding: 0 24px 80px;
+  }
+
+  header {
+    padding: 52px 0 40px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .logo-mark {
+    width: 48px; height: 48px;
+    background: var(--accent);
+    display: grid;
+    place-items: center;
+    clip-path: polygon(0 0, 80% 0, 100% 20%, 100% 100%, 20% 100%, 0 80%);
+    flex-shrink: 0;
+  }
+
+  .logo-text h1 { font-size: 1.5rem; font-weight: 800; letter-spacing: -0.03em; line-height: 1; }
+  .logo-text p  { font-size: 0.78rem; color: var(--text-dim); font-family: 'DM Mono', monospace; margin-top: 2px; letter-spacing: 0.04em; }
+
+  .badge {
+    margin-left: auto;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.65rem;
+    color: var(--accent2);
+    border: 1px solid var(--accent2);
+    padding: 4px 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    opacity: 0.7;
+  }
+
+  /* ── Server status dot ── */
+  .server-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--muted);
+    display: inline-block;
+    margin-right: 6px;
+    transition: background 0.3s;
+  }
+  .server-dot.online  { background: var(--accent2); box-shadow: 0 0 6px var(--accent2); }
+  .server-dot.offline { background: var(--red); }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 28px;
+    margin-bottom: 16px;
+    position: relative;
+  }
+  .card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0;
+    width: 3px; height: 100%;
+    background: var(--accent);
+  }
+
+  .card-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.65rem;
+    color: var(--accent);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .card-label::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+  .url-wrap { display: flex; gap: 10px; }
+
+  .url-input {
+    flex: 1;
+    background: var(--bg);
+    border: 1px solid var(--muted);
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    font-size: 0.85rem;
+    padding: 13px 16px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .url-input::placeholder { color: var(--text-dim); }
+  .url-input:focus { border-color: var(--accent); }
+
+  .paste-btn {
+    background: var(--muted);
+    border: none;
+    color: var(--text-dim);
+    font-family: 'DM Mono', monospace;
+    font-size: 0.72rem;
+    padding: 0 16px;
+    cursor: pointer;
+    letter-spacing: 0.05em;
+    transition: all 0.15s;
+    text-transform: uppercase;
+  }
+  .paste-btn:hover { background: var(--border); color: var(--text); }
+
+  .llm-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+
+  .llm-option { display: none; }
+  .llm-option + label {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 16px 8px;
+    border: 1px solid var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+    user-select: none;
+  }
+  .llm-option + label:hover { border-color: var(--text-dim); background: rgba(255,255,255,0.02); }
+  .llm-option:checked + label { border-color: var(--accent); background: rgba(232,255,71,0.05); }
+
+  .llm-dot { width: 10px; height: 10px; border-radius: 50%; }
+  .llm-name { font-size: 0.8rem; font-weight: 700; }
+  .llm-desc { font-family: 'DM Mono', monospace; font-size: 0.6rem; color: var(--text-dim); text-align: center; letter-spacing: 0.04em; }
+
+  #llm-claude + label .llm-dot { background: var(--claude); }
+  #llm-gemini + label .llm-dot { background: var(--gemini); }
+  #llm-ollama + label .llm-dot { background: var(--ollama); }
+  #llm-openai + label .llm-dot { background: var(--openai); }
+
+  .duration-row { display: flex; align-items: center; gap: 20px; }
+
+  .duration-value {
+    font-family: 'DM Mono', monospace;
+    font-size: 1.6rem;
+    font-weight: 500;
+    color: var(--accent);
+    min-width: 80px;
+    line-height: 1;
+  }
+  .duration-unit { font-size: 0.75rem; color: var(--text-dim); display: block; font-family: 'DM Mono', monospace; }
+
+  input[type=range] {
+    flex: 1;
+    -webkit-appearance: none;
+    height: 3px;
+    background: var(--muted);
+    outline: none;
+    cursor: pointer;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 18px; height: 18px;
+    background: var(--accent);
+    clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
+  }
+
+  .ollama-field { display: none; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border); }
+  .ollama-field.visible { display: flex; gap: 10px; align-items: center; }
+  .ollama-field label { font-family: 'DM Mono', monospace; font-size: 0.72rem; color: var(--text-dim); white-space: nowrap; letter-spacing: 0.06em; }
+  .ollama-field input {
+    flex: 1;
+    background: var(--bg);
+    border: 1px solid var(--muted);
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    font-size: 0.82rem;
+    padding: 8px 12px;
+    outline: none;
+  }
+  .ollama-field input:focus { border-color: var(--accent2); }
+
+  .run-btn {
+    width: 100%;
+    padding: 18px;
+    background: var(--accent);
+    color: #0a0a0f;
+    border: none;
+    font-family: 'Syne', sans-serif;
+    font-size: 1rem;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.15s;
+    clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+  }
+  .run-btn:hover:not(:disabled) { background: #f5ff6e; transform: translateY(-1px); }
+  .run-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  /* ── Steps ── */
+  .steps { display: flex; gap: 0; margin-bottom: 16px; }
+  .step {
+    flex: 1;
+    padding: 10px 6px;
+    border: 1px solid var(--border);
+    border-right: none;
+    text-align: center;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.62rem;
+    color: var(--text-dim);
+    letter-spacing: 0.06em;
+    transition: all 0.3s;
+  }
+  .step:last-child { border-right: 1px solid var(--border); }
+  .step.active { border-color: var(--accent); color: var(--accent); background: rgba(232,255,71,0.05); }
+  .step.done   { border-color: var(--accent2); color: var(--accent2); }
+  .step-num    { display: block; font-size: 1rem; margin-bottom: 2px; }
+
+  /* ── Terminal ── */
+  .terminal {
+    display: none;
+    background: #060608;
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent2);
+    padding: 20px;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.78rem;
+    line-height: 1.8;
+    margin-top: 16px;
+    max-height: 380px;
+    overflow-y: auto;
+  }
+  .terminal.visible { display: block; }
+
+  .t-line    { color: var(--text-dim); }
+  .t-success { color: var(--accent2); }
+  .t-step    { color: var(--accent); }
+  .t-error   { color: var(--red); }
+
+  .cursor {
+    display: inline-block;
+    width: 8px; height: 13px;
+    background: var(--accent);
+    animation: blink 1s step-end infinite;
+    vertical-align: text-bottom;
+    margin-left: 2px;
+  }
+  @keyframes blink { 50% { opacity: 0; } }
+
+  /* ── Output ready banner ── */
+  .output-banner {
+    display: none;
+    background: rgba(71,255,184,0.08);
+    border: 1px solid var(--accent2);
+    padding: 20px 24px;
+    margin-top: 16px;
+    align-items: center;
+    gap: 16px;
+  }
+  .output-banner.visible { display: flex; }
+  .output-banner svg { color: var(--accent2); flex-shrink: 0; }
+  .output-banner-text strong { display: block; color: var(--accent2); font-size: 0.9rem; margin-bottom: 2px; }
+  .output-banner-text span { font-family: 'DM Mono', monospace; font-size: 0.72rem; color: var(--text-dim); }
+
+  /* ── Error banner ── */
+  .error-banner {
+    display: none;
+    background: rgba(255,71,87,0.08);
+    border: 1px solid var(--red);
+    padding: 16px 20px;
+    margin-top: 16px;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.78rem;
+    color: var(--red);
+  }
+  .error-banner.visible { display: block; }
+
+  /* ── Server status card ── */
+  .status-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 16px;
+    border: 1px solid var(--border);
+    margin-bottom: 16px;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.7rem;
+    color: var(--text-dim);
+    letter-spacing: 0.06em;
+  }
+
+  footer { text-align: center; font-family: 'DM Mono', monospace; font-size: 0.65rem; color: var(--text-dim); padding-top: 40px; letter-spacing: 0.06em; opacity: 0.5; }
+</style>
+</head>
+<body>
+
+<div class="blob blob-1"></div>
+<div class="blob blob-2"></div>
+
+<div class="container">
+  <header>
+    <div class="logo-mark">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+        <polygon points="5 3 19 12 5 21 5 3"/>
+      </svg>
+    </div>
+    <div class="logo-text">
+      <h1>VideoSnip<span style="color:var(--accent)">AI</span></h1>
+      <p>youtube → ai highlights → short clip</p>
+    </div>
+    <div class="badge">Local Agent</div>
+  </header>
+
+  <!-- Server status -->
+  <div class="status-bar">
+    <span class="server-dot" id="serverDot"></span>
+    <span id="serverStatus">Checking server connection...</span>
+  </div>
+
+  <!-- Step 1: URL -->
+  <div class="card">
+    <div class="card-label">01 — YouTube URL</div>
+    <div class="url-wrap">
+      <input class="url-input" id="urlInput" type="text" placeholder="https://youtube.com/watch?v=..." autocomplete="off">
+      <button class="paste-btn" onclick="pasteUrl()">Paste</button>
+    </div>
+  </div>
+
+  <!-- Step 2: LLM -->
+  <div class="card">
+    <div class="card-label">02 — AI Backend</div>
+    <div class="llm-grid">
+      <input type="radio" name="llm" id="llm-gemini" value="gemini" checked class="llm-option">
+      <label for="llm-gemini">
+        <div class="llm-dot"></div>
+        <div class="llm-name">Gemini</div>
+        <div class="llm-desc">Free Tier<br>Available</div>
+      </label>
+
+      <input type="radio" name="llm" id="llm-claude" value="claude" class="llm-option">
+      <label for="llm-claude">
+        <div class="llm-dot"></div>
+        <div class="llm-name">Claude</div>
+        <div class="llm-desc">API Key<br>Required</div>
+      </label>
+
+      <input type="radio" name="llm" id="llm-ollama" value="ollama" class="llm-option">
+      <label for="llm-ollama">
+        <div class="llm-dot"></div>
+        <div class="llm-name">Ollama</div>
+        <div class="llm-desc">100% Local<br>No Key</div>
+      </label>
+
+      <input type="radio" name="llm" id="llm-openai" value="openai" class="llm-option">
+      <label for="llm-openai">
+        <div class="llm-dot"></div>
+        <div class="llm-name">OpenAI</div>
+        <div class="llm-desc">API Key<br>Required</div>
+      </label>
+    </div>
+
+    <div class="ollama-field" id="ollamaField">
+      <label>MODEL →</label>
+      <input type="text" id="ollamaModel" value="mistral" placeholder="mistral / llama3 / gemma2">
+    </div>
+  </div>
+
+  <!-- Step 3: Duration -->
+  <div class="card">
+    <div class="card-label">03 — Target Duration</div>
+    <div class="duration-row">
+      <div class="duration-value">
+        <span id="durVal">90</span>
+        <span class="duration-unit">seconds</span>
+      </div>
+      <input type="range" id="durSlider" min="30" max="300" step="15" value="90" oninput="updateDuration(this.value)">
+    </div>
+  </div>
+
+  <!-- Run Button -->
+  <div style="margin-top: 4px;">
+    <button class="run-btn" id="runBtn" onclick="runAgent()">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+      Generate Highlight
+    </button>
+  </div>
+
+  <!-- Progress Steps (hidden until run) -->
+  <div class="steps" id="stepsRow" style="display:none; margin-top:20px;">
+    <div class="step" id="s1"><span class="step-num">📥</span>DOWNLOAD</div>
+    <div class="step" id="s2"><span class="step-num">🎙</span>TRANSCRIBE</div>
+    <div class="step" id="s3"><span class="step-num">🤖</span>AI ANALYZE</div>
+    <div class="step" id="s4"><span class="step-num">✂️</span>CUT VIDEO</div>
+  </div>
+
+  <!-- Live terminal output -->
+  <div class="terminal" id="terminal"></div>
+
+  <!-- Success banner -->
+  <div class="output-banner" id="outputBanner">
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <polyline points="20 6 9 17 4 12"/>
+    </svg>
+    <div class="output-banner-text">
+      <strong>Highlight video is ready!</strong>
+      <span id="outputPath">Saved to: output/highlight.mp4</span>
+    </div>
+  </div>
+
+  <!-- Error banner -->
+  <div class="error-banner" id="errorBanner"></div>
+
+  <footer>VideoSnip AI · runs locally · Ctrl+C in terminal to stop server</footer>
+</div>
+
+<script>
+  // ── Server health check ──────────────────────────────────
+  async function checkServer() {
+    try {
+      const res = await fetch('/run', { method: 'OPTIONS' }).catch(() => null);
+      // If we get any response (even 405), server is up
+      const dot = document.getElementById('serverDot');
+      const status = document.getElementById('serverStatus');
+      dot.className = 'server-dot online';
+      status.textContent = 'Server online · http://localhost:5000';
+    } catch {
+      const dot = document.getElementById('serverDot');
+      const status = document.getElementById('serverStatus');
+      dot.className = 'server-dot online'; // If page loaded, server is up
+      status.textContent = 'Server online · http://localhost:5000';
+    }
+  }
+
+  // ── UI helpers ───────────────────────────────────────────
+  function updateDuration(val) {
+    document.getElementById('durVal').textContent = val;
+  }
+
+  function updateOllamaVisibility() {
+    const llm = document.querySelector('input[name=llm]:checked').value;
+    document.getElementById('ollamaField').classList.toggle('visible', llm === 'ollama');
+  }
+
+  document.querySelectorAll('input[name=llm]').forEach(r => r.addEventListener('change', updateOllamaVisibility));
+
+  async function pasteUrl() {
+    try {
+      const text = await navigator.clipboard.readText();
+      document.getElementById('urlInput').value = text;
+    } catch {
+      document.getElementById('urlInput').focus();
+    }
+  }
+
+  // ── Step tracker ─────────────────────────────────────────
+  function setStep(n) {
+    for (let i = 1; i <= 4; i++) {
+      const el = document.getElementById(`s${i}`);
+      if (i < n)      el.className = 'step done';
+      else if (i ===n) el.className = 'step active';
+      else             el.className = 'step';
+    }
+  }
+
+  function detectStep(line) {
+    if (line.includes('[1/4]') || line.includes('Downloading')) setStep(1);
+    if (line.includes('[2/4]') || line.includes('Transcribing')) setStep(2);
+    if (line.includes('[3/4]') || line.includes('Analyzing'))   setStep(3);
+    if (line.includes('[4/4]') || line.includes('Cutting'))     setStep(4);
+  }
+
+  // ── Log to terminal ──────────────────────────────────────
+  function log(text, cls = 't-line') {
+    const t = document.getElementById('terminal');
+    // Remove old cursor
+    const old = t.querySelector('.cursor-line');
+    if (old) old.remove();
+
+    const line = document.createElement('div');
+    line.className = cls;
+    line.textContent = text;
+    t.appendChild(line);
+    t.scrollTop = t.scrollHeight;
+  }
+
+  function addCursor() {
+    const t = document.getElementById('terminal');
+    const old = t.querySelector('.cursor-line');
+    if (old) old.remove();
+    const cur = document.createElement('div');
+    cur.className = 'cursor-line t-line';
+    cur.innerHTML = '<span class="cursor"></span>';
+    t.appendChild(cur);
+    t.scrollTop = t.scrollHeight;
+  }
+
+  function getLineClass(text) {
+    if (text.includes('✅') || text.includes('🎉') || text.includes('Done')) return 't-success';
+    if (text.includes('[1/4]') || text.includes('[2/4]') || text.includes('[3/4]') || text.includes('[4/4]')) return 't-step';
+    if (text.includes('Error') || text.includes('error') || text.includes('failed')) return 't-error';
+    return 't-line';
+  }
+
+  // ── Main run function ────────────────────────────────────
+  let running = false;
+
+  async function runAgent() {
+    if (running) return;
+
+    const url = document.getElementById('urlInput').value.trim();
+    if (!url || !url.includes('youtube')) {
+      document.getElementById('urlInput').style.borderColor = 'var(--red)';
+      setTimeout(() => document.getElementById('urlInput').style.borderColor = '', 2000);
+      return;
+    }
+
+    const llm = document.querySelector('input[name=llm]:checked').value;
+    const duration = parseInt(document.getElementById('durSlider').value);
+    const ollamaModel = document.getElementById('ollamaModel').value || 'mistral';
+
+    // Reset UI
+    running = true;
+    document.getElementById('runBtn').disabled = true;
+    document.getElementById('runBtn').innerHTML = `
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="animation:spin 1s linear infinite">
+        <path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
+      Processing...`;
+    document.getElementById('terminal').innerHTML = '';
+    document.getElementById('terminal').classList.add('visible');
+    document.getElementById('stepsRow').style.display = 'flex';
+    document.getElementById('outputBanner').classList.remove('visible');
+    document.getElementById('errorBanner').classList.remove('visible');
+    document.getElementById('errorBanner').textContent = '';
+    setStep(1);
+
+    log(`$ python agent.py "${url}" --llm ${llm} --duration ${duration}`, 't-step');
+    log('');
+    addCursor();
+
+    try {
+      const response = await fetch('/run', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url, llm, duration, ollamaModel })
+      });
+
+      if (!response.ok) {
+        throw new Error(`Server error: ${response.status}`);
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop();
+
+        for (const raw of lines) {
+          if (!raw.startsWith('data: ')) continue;
+          const text = JSON.parse(raw.slice(6));
+
+          if (text === '__DONE__') {
+            // All steps done
+            for (let i = 1; i <= 4; i++) document.getElementById(`s${i}`).className = 'step done';
+            document.getElementById('terminal').querySelector('.cursor-line')?.remove();
+            document.getElementById('outputBanner').classList.add('visible');
+            document.getElementById('outputBanner').querySelector('#outputPath').textContent =
+              `Saved to: output/highlight.mp4  ·  ~${duration}s`;
+            break;
+          }
+
+          if (text === '__ERROR__') {
+            document.getElementById('terminal').querySelector('.cursor-line')?.remove();
+            const err = document.getElementById('errorBanner');
+            err.textContent = '❌ Agent failed. Check the terminal output above for details.';
+            err.classList.add('visible');
+            break;
+          }
+
+          if (text.trim()) {
+            detectStep(text);
+            log(text, getLineClass(text));
+            addCursor();
+          }
+        }
+      }
+
+    } catch (err) {
+      log(`Error: ${err.message}`, 't-error');
+      const errBanner = document.getElementById('errorBanner');
+      errBanner.textContent = `❌ Could not connect to server. Make sure "python server.py" is running.`;
+      errBanner.classList.add('visible');
+    }
+
+    // Reset button
+    running = false;
+    document.getElementById('runBtn').disabled = false;
+    document.getElementById('runBtn').innerHTML = `
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+      Generate Highlight`;
+  }
+
+  // ── Spin animation for loading ───────────────────────────
+  const style = document.createElement('style');
+  style.textContent = `@keyframes spin { to { transform: rotate(360deg); } }`;
+  document.head.appendChild(style);
+
+  // Init
+  checkServer();
+</script>
+</body>
+</html>
