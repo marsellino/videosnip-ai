@@ -35,7 +35,6 @@ Respond ONLY with valid JSON, no markdown:
 
 
 def get_segments(transcript, llm, target_duration=120, ollama_model="mistral"):
-    """Returns a list of clips, each clip is a list of segments."""
     formatted = format_transcript_for_llm(transcript)
     prompt = PROMPT.format(transcript=formatted, target_duration=target_duration)
 
@@ -45,9 +44,12 @@ def get_segments(transcript, llm, target_duration=120, ollama_model="mistral"):
     elif llm == "openai": raw = _openai(prompt)
     else: raise ValueError(f"Unknown LLM: {llm}")
 
-    return _parse(raw, transcript)
+    result = _parse(raw, transcript)
 
+    if not result:
+        raise ValueError("No clips returned from LLM.")
 
+    return result
 def _parse(raw, transcript):
     raw = re.sub(r"```json|```", "", raw).strip()
     try:
@@ -55,12 +57,21 @@ def _parse(raw, transcript):
     except:
         m = re.search(r"\{.*\}", raw, re.DOTALL)
         if m: data = json.loads(m.group())
-        else: raise ValueError(f"Invalid JSON from LLM: {raw[:300]}")
+        else: raise ValueError(f"Invalid JSON: {raw[:300]}")
 
     total_duration = transcript["segments"][-1]["end"] if transcript["segments"] else 9999
-    clips_raw = data.get("clips", [])
-    clips = []
 
+    # Handle both formats: {"clips": [...]} and {"segments": [...]}
+    if "clips" in data:
+        clips_raw = data["clips"]
+    elif "segments" in data:
+        # Old format — wrap into a single clip
+        clips_raw = [{"title": "Highlight", "segments": data["segments"]}]
+    else:
+        # Maybe it's a direct list
+        clips_raw = data if isinstance(data, list) else []
+
+    clips = []
     for clip in clips_raw:
         title = clip.get("title", f"clip_{len(clips)+1}")
         valid_segs = []
@@ -83,7 +94,6 @@ def _parse(raw, transcript):
         raise ValueError("LLM returned no valid clips.")
 
     return clips
-
 
 def _gemini(prompt):
     from google import genai
